@@ -48,7 +48,7 @@ func shellParser(sourceFile string, encoding string, destFile string) error {
 	}
 	defer source.Close()
 
-	dest, err := os.Open(destFile)
+	dest, err := os.Create(destFile)
 	if err != nil {
 		return err
 	}

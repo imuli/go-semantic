@@ -6,6 +6,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/imuli/go-semantic/ast"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/ianaindex"
 	"io"
 	"os"
 )
@@ -23,15 +25,24 @@ var Usage = func() {
 
 var protocol int
 var pretty bool
-var parser func(io.Reader, string) (ast.File, error)
+var parser func(io.Reader, string, encoding.Encoding) (ast.File, error)
 
 func init() {
 	flag.IntVar(&protocol, "proto", 2, "protocol `version` (1 or 2)")
 	flag.BoolVar(&pretty, "pretty", false, "pretty print output")
 }
 
-func runParser(source io.Reader, name string, dest io.Writer) error {
-	ast, err := parser(source, name)
+func runParser(source io.Reader, name string, encoding string, dest io.Writer) error {
+	// look up encoding names
+	code, err := ianaindex.IANA.Encoding(encoding)
+	if err != nil {
+		// also use this database
+		code, err = ianaindex.MIB.Encoding(encoding)
+		if err != nil {
+			return err
+		}
+	}
+	ast, err := parser(source, name, code)
 	if err != nil {
 		return err
 	}
@@ -61,11 +72,7 @@ func shellParser(sourceFile string, encoding string, destFile string) error {
 	}
 	defer dest.Close()
 
-	if encoding != "" {
-		// FIXME replace source stream with decoder
-	}
-
-	err = runParser(source, sourceFile, dest)
+	err = runParser(source, sourceFile, encoding, dest)
 	if err != nil {
 		return err
 	}
@@ -116,7 +123,7 @@ func shell(flagFile string) {
 	}
 }
 
-func Run(parse func(io.Reader, string) (ast.File, error)) {
+func Run(parse func(io.Reader, string, encoding.Encoding) (ast.File, error)) {
 	parser = parse
 	args := flag.Args()
 	switch true {
@@ -129,7 +136,7 @@ func Run(parse func(io.Reader, string) (ast.File, error)) {
 		if err != nil {
 			Usage()
 		}
-		err = runParser(f, sourceFile, os.Stdout)
+		err = runParser(f, sourceFile, "utf-8", os.Stdout)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 		}

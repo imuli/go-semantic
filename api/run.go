@@ -22,10 +22,12 @@ var Usage = func() {
 }
 
 var protocol int
+var pretty bool
 var parser func(io.Reader, string) (ast.File, error)
 
 func init() {
 	flag.IntVar(&protocol, "proto", 2, "protocol `version` (1 or 2)")
+	flag.BoolVar(&pretty, "pretty", false, "pretty print output")
 }
 
 func runParser(source io.Reader, name string, dest io.Writer) error {
@@ -33,7 +35,12 @@ func runParser(source io.Reader, name string, dest io.Writer) error {
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(ast)
+	var b []byte
+	if pretty {
+		b, err = json.MarshalIndent(ast, "", " ")
+	} else {
+		b, err = json.Marshal(ast)
+	}
 	if err != nil {
 		return err
 	}

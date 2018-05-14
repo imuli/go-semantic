@@ -6,7 +6,7 @@ type LocationSpan struct {
 }
 
 type ParsingError struct {
-	Location []int  `json:"location"`
+	Location [2]int  `json:"location"`
 	Message  string `json:"message"`
 }
 
@@ -40,18 +40,19 @@ func MakeLines(buf []byte) []int {
 		}
 	}
 	lines = append(lines, len(buf))
+	lines = append(lines, 2<<30 - 1)
 	return lines
 }
 
 func GetLine(lines []int, offset int) int {
-	left := 0
-	right := len(lines)
-	for right > left + 1 {
+	left := 1
+	right := len(lines) - 1
+	for left + 1 < right {
 		mid := (left + right) / 2
 		switch true {
 		case offset < lines[mid]:
 			right = mid
-		case lines[mid] < offset:
+		case offset >= lines[mid + 1]:
 			left = mid
 		default:
 			return mid
@@ -68,7 +69,7 @@ func LineChar(lines []int, offset int, shift int) [2]int {
 func MakeLoc(lines []int, start int, stop int) LocationSpan {
 	return LocationSpan{
 		Start: LineChar(lines, start, 0),
-		End:   LineChar(lines, stop + 1, -1),
+		End:   LineChar(lines, stop, 1),
 	}
 }
 
@@ -125,11 +126,11 @@ func CleanNode(node Node, lines []int, pEnd int, nStart int) *Node {
 
 // prepare ast for consumption by semantic merge
 func CleanFile(file *File, lines []int) *File {
-	length := lines[len(lines)-1]
+	length := lines[len(lines)-2]
 	file.LocationSpan = MakeLoc(lines, 0, length - 1)
 
-	// can't have an empty File
-	if len(file.Children) == 0 {
+	// can't have an empty File unless it's all empty
+	if length != 0 && len(file.Children) == 0 {
 		file.Children = []Node{
 			{
 				Kind: "raw",
@@ -139,7 +140,7 @@ func CleanFile(file *File, lines []int) *File {
 	}
 
 	// insert the header if necessary
-	if file.Children[0].Span[0] != 0 {
+	if length != 0 && file.Children[0].Span[0] != 0 {
 		file.Children = append([]Node{{
 			Kind: "header",
 			Span: &[2]int{0, file.Children[0].Span[0] - 1},
@@ -162,7 +163,7 @@ func CleanFile(file *File, lines []int) *File {
 		file.Children[i] = *clean
 	}
 
-	file.FooterSpan = [2]int{file.Children[len(file.Children)-1].Span[1] + 1, length - 1};
+	file.FooterSpan = [2]int{pEnd + 1, length - 1};
 
 	return file
 }

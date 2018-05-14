@@ -1,33 +1,33 @@
 package ast
 
 type LocationSpan struct {
-	Start [2]int `json:"start"`
-	End   [2]int `json:"end"`
+	Start [2]int `yaml:"start,flow"`
+	End   [2]int `yaml:"end,flow"`
 }
 
 type ParsingError struct {
-	Location [2]int  `json:"location"`
-	Message  string `json:"message"`
+	Location [2]int `yaml:"location,flow"`
+	Message  string `yaml:"message"`
 }
 
 type File struct {
-	Kind                  string        `json:"type"`
-	Name                  string        `json:"name"`
-	LocationSpan          LocationSpan  `json:"locationSpan"`
-	FooterSpan            [2]int        `json:"footerSpan"`
-	ParsingErrorsDetected bool          `json:"parsingErrorsDetected"`
-	Children              []Node        `json:"children"`
-	ParsingError          *ParsingError `json:"parsingError,omitempty"`
+	Kind                  string        `yaml:"type"`
+	Name                  string        `yaml:"name"`
+	LocationSpan          LocationSpan  `yaml:"locationSpan,flow"`
+	FooterSpan            [2]int        `yaml:"footerSpan,flow"`
+	ParsingErrorsDetected bool          `yaml:"parsingErrorsDetected"`
+	Children              []Node        `yaml:"children"`
+	ParsingError          *ParsingError `yaml:"parsingError,omitempty"`
 }
 
 type Node struct {
-	Kind         string       `json:"type"`
-	Name         string       `json:"name"`
-	LocationSpan LocationSpan `json:"locationSpan"`
-	Span         *[2]int       `json:"span,omitempty"`       // only in leaf nodes
-	HeaderSpan   *[2]int       `json:"headerSpan,omitempty"` // \
-	FooterSpan   *[2]int       `json:"footerSpan,omitempty"` //  } only in container nodes
-	Children     []Node       `json:"children,omitempty"`   // /
+	Kind         string       `yaml:"type"`
+	Name         string       `yaml:"name"`
+	LocationSpan LocationSpan `yaml:"locationSpan,flow"`
+	Span         *[2]int      `yaml:"span,omitempty,flow"`       // only in leaf nodes
+	HeaderSpan   *[2]int      `yaml:"headerSpan,omitempty,flow"` // \
+	FooterSpan   *[2]int      `yaml:"footerSpan,omitempty,flow"` //  } only in container nodes
+	Children     []Node       `yaml:"children,omitempty"`        // /
 }
 
 func MakeLines(buf []byte) []int {
@@ -40,19 +40,19 @@ func MakeLines(buf []byte) []int {
 		}
 	}
 	lines = append(lines, len(buf))
-	lines = append(lines, 2<<30 - 1)
+	lines = append(lines, 2<<30-1)
 	return lines
 }
 
 func GetLine(lines []int, offset int) int {
 	left := 1
 	right := len(lines) - 1
-	for left + 1 < right {
+	for left+1 < right {
 		mid := (left + right) / 2
 		switch true {
 		case offset < lines[mid]:
 			right = mid
-		case offset >= lines[mid + 1]:
+		case offset >= lines[mid+1]:
 			left = mid
 		default:
 			return mid
@@ -78,7 +78,7 @@ func CleanNode(node Node, lines []int, pEnd int, nStart int) *Node {
 	// extend back to just after the previous Node
 	node.Span[0] = pEnd + 1
 	// extend up to the end of line, or the next Node
-	nextLine := lines[GetLine(lines, node.Span[1]) + 1]
+	nextLine := lines[GetLine(lines, node.Span[1])+1]
 	if nextLine < nStart {
 		node.Span[1] = nextLine - 1
 	} else {
@@ -95,7 +95,7 @@ func CleanNode(node Node, lines []int, pEnd int, nStart int) *Node {
 	node.HeaderSpan[0] = node.Span[0]
 
 	// extend header to the end of line, or the first child Node
-	nextLine = lines[GetLine(lines, node.HeaderSpan[1]) + 1]
+	nextLine = lines[GetLine(lines, node.HeaderSpan[1])+1]
 	if nextLine < node.Children[0].Span[0] {
 		node.HeaderSpan[1] = nextLine - 1
 	} else {
@@ -106,7 +106,7 @@ func CleanNode(node Node, lines []int, pEnd int, nStart int) *Node {
 	pcEnd := node.HeaderSpan[1]
 	for i, child := range node.Children {
 		var ncStart int
-		if i == len(node.Children) - 1 {
+		if i == len(node.Children)-1 {
 			ncStart = node.FooterSpan[0]
 		} else {
 			ncStart = node.Children[i+1].Span[0]
@@ -127,7 +127,7 @@ func CleanNode(node Node, lines []int, pEnd int, nStart int) *Node {
 // prepare ast for consumption by semantic merge
 func CleanFile(file *File, lines []int) *File {
 	length := lines[len(lines)-2]
-	file.LocationSpan = MakeLoc(lines, 0, length - 1)
+	file.LocationSpan = MakeLoc(lines, 0, length-1)
 
 	// can't have an empty File unless it's all empty
 	if length != 0 && len(file.Children) == 0 {
@@ -136,7 +136,7 @@ func CleanFile(file *File, lines []int) *File {
 				Kind: "raw",
 				Span: &[2]int{0, length},
 			},
-		};
+		}
 	}
 
 	// insert the header if necessary
@@ -150,7 +150,7 @@ func CleanFile(file *File, lines []int) *File {
 	pEnd := -1
 	for i, child := range file.Children {
 		var nStart int
-		if i == len(file.Children) - 1 {
+		if i == len(file.Children)-1 {
 			nStart = length
 		} else {
 			nStart = file.Children[i+1].Span[0]
@@ -163,7 +163,7 @@ func CleanFile(file *File, lines []int) *File {
 		file.Children[i] = *clean
 	}
 
-	file.FooterSpan = [2]int{pEnd + 1, length - 1};
+	file.FooterSpan = [2]int{pEnd + 1, length - 1}
 
 	return file
 }

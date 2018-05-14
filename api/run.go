@@ -2,9 +2,9 @@ package api
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/go-yaml/yaml"
 	"github.com/imuli/go-semantic/ast"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/ianaindex"
@@ -24,12 +24,10 @@ var Usage = func() {
 }
 
 var protocol int
-var pretty bool
 var parser func(io.Reader, string, encoding.Encoding) (ast.File, error)
 
 func init() {
 	flag.IntVar(&protocol, "proto", 2, "protocol `version` (1 or 2)")
-	flag.BoolVar(&pretty, "pretty", false, "pretty print output")
 }
 
 func runParser(source io.Reader, name string, encoding string, dest io.Writer) error {
@@ -46,12 +44,7 @@ func runParser(source io.Reader, name string, encoding string, dest io.Writer) e
 	if err != nil {
 		return err
 	}
-	var b []byte
-	if pretty {
-		b, err = json.MarshalIndent(ast, "", " ")
-	} else {
-		b, err = json.Marshal(ast)
-	}
+	b, err := yaml.Marshal(ast)
 	if err != nil {
 		return err
 	}

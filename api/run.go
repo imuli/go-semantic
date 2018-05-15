@@ -27,7 +27,7 @@ var protocol int
 var parser func(io.Reader, string, encoding.Encoding) (ast.File, error)
 
 func init() {
-	flag.IntVar(&protocol, "proto", 2, "protocol `version` (1 or 2)")
+	flag.IntVar(&protocol, "proto", 2, "SemanticMerge protocol `version` (1 or 2)")
 }
 
 func runParser(source io.Reader, name string, encoding string, dest io.Writer) error {

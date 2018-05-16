@@ -83,7 +83,7 @@ func shell(flagFile string) {
 	}
 	flag.Close()
 
-	// parse input two or three lines at a time
+	// parse input two or three lines at a time until receiving "end"
 	// 1. source filename
 	// 2. protocol v2 adds source file encoding here
 	// 3. destination filename
@@ -95,6 +95,8 @@ func shell(flagFile string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		switch true {
+		case line == "end":
+			return
 		case sourceFile == "":
 			sourceFile = line
 		case protocol > 1 && codeName == "":

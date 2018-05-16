@@ -30,15 +30,17 @@ func init() {
 	flag.IntVar(&protocol, "proto", 2, "SemanticMerge protocol `version` (1 or 2)")
 }
 
-func runParser(source io.Reader, name string, encoding string, dest io.Writer) error {
+func runParser(source io.Reader, name string, codeName string, dest io.Writer) error {
+	if codeName == "" {
+		codeName = "UTF-8"
+	}
 	// look up encoding names
-	code, err := ianaindex.IANA.Encoding(encoding)
+	code, err := ianaindex.IANA.Encoding(codeName)
 	if err != nil {
-		// also use this database
-		code, err = ianaindex.MIB.Encoding(encoding)
-		if err != nil {
-			return err
-		}
+		return err
+	}
+	if code == nil { // hack around encodings without entries in .../encoding/ianaindex
+		code = encoding.Replacement
 	}
 	ast, err := parser(source, name, code)
 	if err != nil {
@@ -52,7 +54,7 @@ func runParser(source io.Reader, name string, encoding string, dest io.Writer) e
 	return err
 }
 
-func shellParser(sourceFile string, encoding string, destFile string) error {
+func shellParser(sourceFile string, codeName string, destFile string) error {
 	source, err := os.Open(sourceFile)
 	if err != nil {
 		return err
@@ -65,7 +67,7 @@ func shellParser(sourceFile string, encoding string, destFile string) error {
 	}
 	defer dest.Close()
 
-	err = runParser(source, sourceFile, encoding, dest)
+	err = runParser(source, sourceFile, codeName, dest)
 	if err != nil {
 		return err
 	}
@@ -87,7 +89,7 @@ func shell(flagFile string) {
 	// 3. destination filename
 	scanner := bufio.NewScanner(os.Stdin)
 	var sourceFile string = ""
-	var encoding string = ""
+	var codeName string = ""
 	var destFile string = ""
 
 	for scanner.Scan() {
@@ -95,13 +97,13 @@ func shell(flagFile string) {
 		switch true {
 		case sourceFile == "":
 			sourceFile = line
-		case protocol > 1 && encoding == "":
-			encoding = line
+		case protocol > 1 && codeName == "":
+			codeName = line
 		case destFile == "":
 			destFile = line
 
 			// launch the parser
-			err := shellParser(sourceFile, encoding, destFile)
+			err := shellParser(sourceFile, codeName, destFile)
 			if err == nil {
 				fmt.Print("OK\n")
 			} else {
@@ -110,7 +112,7 @@ func shell(flagFile string) {
 
 			// clear variables to read another batch
 			sourceFile = ""
-			encoding = ""
+			codeName = ""
 			destFile = ""
 		}
 	}

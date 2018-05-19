@@ -24,7 +24,7 @@ var Usage = func() {
 }
 
 var protocol int
-var parser func(io.Reader, string, encoding.Encoding) (ast.File, error)
+var parser func(io.Reader, string) (ast.File, error)
 
 func init() {
 	flag.IntVar(&protocol, "proto", 2, "SemanticMerge protocol `version` (1 or 2)")
@@ -42,7 +42,9 @@ func runParser(source io.Reader, name string, codeName string, dest io.Writer) e
 	if code == nil { // hack around encodings without entries in .../encoding/ianaindex
 		code = encoding.Replacement
 	}
-	ast, err := parser(source, name, code)
+	// run the source through the decoder
+	source = code.NewDecoder().Reader(source)
+	ast, err := parser(source, name)
 	if err != nil {
 		return err
 	}
@@ -120,7 +122,7 @@ func shell(flagFile string) {
 	}
 }
 
-func Run(parse func(io.Reader, string, encoding.Encoding) (ast.File, error)) {
+func Run(parse func(io.Reader, string) (ast.File, error)) {
 	parser = parse
 	args := flag.Args()
 	switch true {

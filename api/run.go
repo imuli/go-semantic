@@ -2,13 +2,14 @@ package api
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/go-yaml/yaml"
 	"github.com/imuli/go-semantic/ast"
-	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/ianaindex"
 	"io"
+	"io/ioutil"
 	"os"
 )
 
@@ -24,7 +25,7 @@ var Usage = func() {
 }
 
 var protocol int
-var parser func(io.Reader, string) (ast.File, error)
+var parser func([]byte, string) (*ast.File, error)
 
 func init() {
 	flag.IntVar(&protocol, "proto", 2, "SemanticMerge protocol `version` (1 or 2)")
@@ -39,16 +40,29 @@ func runParser(source io.Reader, name string, codeName string, dest io.Writer) e
 	if err != nil {
 		return err
 	}
-	if code == nil { // hack around encodings without entries in .../encoding/ianaindex
-		code = encoding.Replacement
+	if code != nil { // hack around encodings without entries in .../encoding/ianaindex
+		source = code.NewDecoder().Reader(source)
 	}
-	// run the source through the decoder
-	source = code.NewDecoder().Reader(source)
-	ast, err := parser(source, name)
+	// read the file into memory
+	buf, err := ioutil.ReadAll(source)
 	if err != nil {
 		return err
 	}
-	b, err := yaml.Marshal(ast)
+	// run the source through the decoder
+	file, err := parser(buf, name)
+	if err != nil {
+		return err
+	}
+
+	// clean up syntax tree
+	vitals := ast.MakeVitals(buf)
+	file = vitals.CleanFile(file)
+	if file == nil {
+		return errors.New("CleanFile failure")
+	}
+
+	// convert to yaml
+	b, err := yaml.Marshal(file)
 	if err != nil {
 		return err
 	}
@@ -122,7 +136,7 @@ func shell(flagFile string) {
 	}
 }
 
-func Run(parse func(io.Reader, string) (ast.File, error)) {
+func Run(parse func([]byte, string) (*ast.File, error)) {
 	parser = parse
 	args := flag.Args()
 	switch true {

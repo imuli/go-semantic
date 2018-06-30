@@ -6,13 +6,20 @@ type LocationSpan struct {
 }
 
 type ParsingError struct {
+	Position int    `yaml:"-"`
 	Location [2]int `yaml:"location,flow"`
 	Message  string `yaml:"message"`
 }
 
+const (
+	NumberingBytes = iota
+	NumberingUTF16 = iota
+)
+
 type File struct {
 	Kind                  string        `yaml:"type"`
 	Name                  string        `yaml:"name"`
+	Numbering             int           `yaml:"-"`
 	LocationSpan          LocationSpan  `yaml:"locationSpan,flow"`
 	FooterSpan            [2]int        `yaml:"footerSpan,flow"`
 	ParsingErrorsDetected bool          `yaml:"parsingErrorsDetected"`
@@ -32,26 +39,26 @@ type Node struct {
 
 type Vitals struct {
 	length int
-	lines []int // offsets of start of lines
-	line []int // line number of each byte
-	col []int // column number of each byte
-	char []int // character number of each byte
+	lines  []int // offsets of start of lines
+	line   []int // line number of each byte
+	col    []int // column number of each byte
+	char   []int // character number of each byte
 }
 
 func MakeVitals(source []byte) (v *Vitals) {
 	v = &Vitals{
 		length: len(source),
-		lines: []int{-1, 0}, // 0th line doesn't exist, 1st line starts at byte 0
-		line: make([]int, len(source)+1),
-		col: make([]int, len(source)+1),
-		char: make([]int, len(source)+1),
+		lines:  []int{-1, 0}, // 0th line doesn't exist, 1st line starts at byte 0
+		line:   make([]int, len(source)+1),
+		col:    make([]int, len(source)+1),
+		char:   make([]int, len(source)+1),
 	}
 
 	line := 1 // start counting lines at 1
-	col := 1 // columns at 1
+	col := 1  // columns at 1
 	char := 0 // characters at 0
 
-	for i,c := range source {
+	for i, c := range source {
 		v.line[i] = line
 		v.col[i] = col
 		v.char[i] = char
@@ -60,13 +67,13 @@ func MakeVitals(source []byte) (v *Vitals) {
 		case c == '\n':
 			// at \n, the next character will be the beginning of the next line
 			v.lines = append(v.lines, i+1)
-			line++;
-			col = 0; // columns start at 1, and we're adding one below
-		case c & 0xc0 == 0x80:
+			line++
+			col = 0 // columns start at 1, and we're adding one below
+		case c&0xc0 == 0x80:
 			// bytes with bits 10xxxxxx indicate a multibyte contiuation sequence
 			// they don't count toward character or column counts
 			continue
-		case c & 0xf0 == 0xf0:
+		case c&0xf0 == 0xf0:
 			// bytes with bits 1111xxxx indicate unicode >0x10000
 			// they take up two characters
 			col++
@@ -89,7 +96,7 @@ func (v *Vitals) GetLine(offset int) int {
 	case offset < 0:
 		return 1
 	case offset > v.length:
-		return len(v.line)-2
+		return len(v.line) - 2
 	default:
 		return v.line[offset]
 	}
@@ -98,9 +105,9 @@ func (v *Vitals) GetLine(offset int) int {
 func (v *Vitals) GetCol(offset int) int {
 	switch true {
 	case offset < 0:
-		return 0;
+		return 0
 	case offset > v.length:
-		return 0;
+		return 0
 	default:
 		return v.col[offset]
 	}
@@ -109,9 +116,9 @@ func (v *Vitals) GetCol(offset int) int {
 func (v *Vitals) GetChar(offset int) int {
 	switch true {
 	case offset < 0:
-		return -1;
+		return -1
 	case offset > v.length:
-		return v.char[v.length] + offset - v.length;
+		return v.char[v.length] + offset - v.length
 	default:
 		return v.char[offset]
 	}
@@ -217,12 +224,16 @@ func (v *Vitals) CleanFile(file *File) *File {
 		file.Children[i] = *clean
 	}
 
-	file.FooterSpan = [2]int{pEnd + 1, v.length - 1}
-
+	switch file.Numbering {
+	case NumberingBytes:
+		file.FooterSpan = [2]int{pEnd + 1, v.length - 1}
+	case NumberingUTF16:
+		file.FooterSpan = [2]int{pEnd + 1, v.GetChar(v.length) - 1}
+	}
 	return v.convertSpans(file)
 }
 
-func (v *Vitals) convertSpan(span *[2]int) *[2]int{
+func (v *Vitals) convertSpan(span *[2]int) *[2]int {
 	if span != nil {
 		span[0] = v.GetChar(span[0])
 		span[1] = v.GetChar(span[1])
@@ -242,10 +253,16 @@ func (v *Vitals) convertNodeSpans(node Node) Node {
 }
 
 func (v *Vitals) convertSpans(node *File) *File {
+	if node.Numbering == NumberingUTF16 {
+		return node
+	}
 	node.FooterSpan = *v.convertSpan(&node.FooterSpan)
 	for i, child := range node.Children {
 		node.Children[i] = v.convertNodeSpans(child)
 	}
+	if node.ParsingError != nil {
+		node.ParsingError.Location = v.LineChar(node.ParsingError.Position)
+	}
+	node.Numbering = NumberingUTF16
 	return node
 }
-

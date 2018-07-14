@@ -70,8 +70,10 @@ func MakeVitals(source []byte) (v *Vitals) {
 			line++
 			col = 0 // columns start at 1, and we're adding one below
 		case c&0xc0 == 0x80:
-			// bytes with bits 10xxxxxx indicate a multibyte contiuation sequence
+			// bytes with bits 10xxxxxx indicate a multibyte continuation sequence
 			// they don't count toward character or column counts
+			v.col[i] = v.col[i-1]
+			v.char[i] = v.char[i-1]
 			continue
 		case c&0xf0 == 0xf0:
 			// bytes with bits 1111xxxx indicate unicode >0x10000

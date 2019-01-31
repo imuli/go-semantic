@@ -64,8 +64,8 @@ func MakeVitals(source []byte) (v *Vitals) {
 		v.char[i] = char
 
 		switch true {
-		case c == '\n':
-			// at \n, the next character will be the beginning of the next line
+		case c == '\n' || c == '\r' && (len(source) <= i+1 || source[i+1] != '\n'):
+			// at \n or (\r not followed by \n), the next character will be the beginning of the next line
 			v.lines = append(v.lines, i+1)
 			line++
 			col = 0 // columns start at 1, and we're adding one below

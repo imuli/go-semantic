@@ -17,14 +17,14 @@ const (
 )
 
 type File struct {
-	Kind                  string        `yaml:"type"`
-	Name                  string        `yaml:"name"`
-	Numbering             int           `yaml:"-"`
-	LocationSpan          LocationSpan  `yaml:"locationSpan,flow"`
-	FooterSpan            [2]int        `yaml:"footerSpan,flow"`
-	ParsingErrorsDetected bool          `yaml:"parsingErrorsDetected"`
-	Children              []Node        `yaml:"children"`
-	ParsingError          *ParsingError `yaml:"parsingError,omitempty"`
+	Kind                  string         `yaml:"type"`
+	Name                  string         `yaml:"name"`
+	Numbering             int            `yaml:"-"`
+	LocationSpan          LocationSpan   `yaml:"locationSpan,flow"`
+	FooterSpan            [2]int         `yaml:"footerSpan,flow"`
+	ParsingErrorsDetected bool           `yaml:"parsingErrorsDetected"`
+	Children              []Node         `yaml:"children"`
+	ParsingError          []ParsingError `yaml:"parsingError,omitempty"`
 }
 
 type Node struct {
@@ -262,8 +262,8 @@ func (v *Vitals) convertSpans(node *File) *File {
 	for i, child := range node.Children {
 		node.Children[i] = v.convertNodeSpans(child)
 	}
-	if node.ParsingError != nil {
-		node.ParsingError.Location = v.LineChar(node.ParsingError.Position)
+	for i := range node.ParsingError {
+		node.ParsingError[i].Location = v.LineChar(node.ParsingError[i].Position)
 	}
 	node.Numbering = NumberingUTF16
 	return node
